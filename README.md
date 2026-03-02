@@ -28,6 +28,22 @@ This repository branch contains only the assets prepared for Codex use.
 4. Use skills from `.agents/skills/`.
 5. Use playbooks from `.codex/commands/`, `.codex/agents/`, and `.codex/contexts/`.
 
+## Drop-In Packs
+
+Prepared copy-ready bundles are available in `.codex/drop-in/`:
+
+- `universal-dev/` — conflict-safe default for general software development
+- `full/` — complete skill library
+
+Each pack includes:
+- `.agents/skills/`
+- `.codex/` playbooks and config references
+- `AGENTS.md`
+- `LICENSE`
+- `SKILLS_MANIFEST.txt`
+
+Conflict analysis and curation decisions are documented in `.codex/SKILL_CONFLICT_AUDIT.md`.
+
 ## Notes
 
 - This branch intentionally excludes Claude/Cursor/OpenCode runtime assets.

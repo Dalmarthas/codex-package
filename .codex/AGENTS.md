@@ -71,3 +71,7 @@ Additional Codex-oriented resources are available under `.codex/`:
 - `.codex/scripts/` and `.codex/tests/` — validator/codemap utilities
 
 Porting details and exclusions are documented in `.codex/TRANSFER_REPORT.md`.
+
+## Skill Audit
+
+See `.codex/SKILL_CONFLICT_AUDIT.md` for overlap/conflict findings and `.codex/drop-in/` for ready-to-copy bundles.
