@@ -1,103 +1,74 @@
 ---
 name: strategic-compact
-description: Suggests manual context compaction at logical intervals to preserve context through task phases rather than arbitrary auto-compaction.
+description: Suggest manual `/compact` at logical task boundaries to preserve quality during long Codex sessions.
 origin: ECC
 ---
 
 # Strategic Compact Skill
 
-Suggests manual `/compact` at strategic points in your workflow rather than relying on arbitrary auto-compaction.
+Suggest `/compact` at useful workflow boundaries, not arbitrary points.
 
 ## When to Activate
 
-- Running long sessions that approach context limits (200K+ tokens)
-- Working on multi-phase tasks (research → plan → implement → test)
-- Switching between unrelated tasks within the same session
-- After completing a major milestone and starting new work
-- When responses slow down or become less coherent (context pressure)
+- Long sessions approaching context pressure
+- Multi-phase tasks (research -> plan -> implementation -> validation)
+- Major task switches inside one conversation
+- After finishing a milestone and before starting unrelated work
 
-## Why Strategic Compaction?
+## Why This Exists
 
-Auto-compaction triggers at arbitrary points:
-- Often mid-task, losing important context
-- No awareness of logical task boundaries
-- Can interrupt complex multi-step operations
+Auto compaction (when available) can trigger mid-task and discard high-value active context.
 
-Strategic compaction at logical boundaries:
-- **After exploration, before execution** — Compact research context, keep implementation plan
-- **After completing a milestone** — Fresh start for next phase
-- **Before major context shifts** — Clear exploration context before different task
+Strategic compaction preserves quality by compacting only at phase boundaries.
 
-## How It Works
+## Codex-Native Behavior
 
-The `suggest-compact.js` script runs on PreToolUse (Edit/Write) and:
+When this skill is active, proactively suggest `/compact` when both are true:
 
-1. **Tracks tool calls** — Counts tool invocations in session
-2. **Threshold detection** — Suggests at configurable threshold (default: 50 calls)
-3. **Periodic reminders** — Reminds every 25 calls after threshold
+1. A phase boundary is reached (e.g., planning complete, implementation complete, debugging finished)
+2. Session context is materially large (many tool calls, large logs, broad file traversal)
 
-## Hook Setup
+Do **not** suggest compaction mid-implementation unless context quality is clearly degrading.
 
-Add to your `~/.codex/config.toml`:
+## Optional Counter Helper
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit",
-        "hooks": [{ "type": "command", "command": "node ~/.agents/skills/strategic-compact/suggest-compact.js" }]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [{ "type": "command", "command": "node ~/.agents/skills/strategic-compact/suggest-compact.js" }]
-      }
-    ]
-  }
-}
+Use the included helper to track tool checkpoints and prompt reminders:
+
+```bash
+# Track a checkpoint manually
+python3 .agents/skills/strategic-compact/suggest-compact.py --tool Edit
+
+# Read tool from hook payload (if runtime supports hooks)
+python3 .agents/skills/strategic-compact/suggest-compact.py --from-hook
+
+# Reset counters after compaction
+python3 .agents/skills/strategic-compact/suggest-compact.py --reset
 ```
 
-## Configuration
+Defaults:
+- First suggestion at 50 checkpoints
+- Repeat every 25 checkpoints
 
-Environment variables:
-- `COMPACT_THRESHOLD` — Tool calls before first suggestion (default: 50)
+Tune via `--threshold` and `--interval`.
 
-## Compaction Decision Guide
+## Decision Guide
 
-Use this table to decide when to compact:
+| Transition | Compact? | Rationale |
+|-----------|----------|-----------|
+| Research -> Planning | Yes | Keep distilled plan, drop bulky exploration context |
+| Planning -> Implementation | Yes | Plan is persistent; free context for execution |
+| Implementation -> Testing | Maybe | Keep if tests depend on immediate code context |
+| Debugging -> New feature | Yes | Remove dead-end traces and error noise |
+| Mid-implementation | No | Active local state is still valuable |
 
-| Phase Transition | Compact? | Why |
-|-----------------|----------|-----|
-| Research → Planning | Yes | Research context is bulky; plan is the distilled output |
-| Planning → Implementation | Yes | Plan is in TodoWrite or a file; free up context for code |
-| Implementation → Testing | Maybe | Keep if tests reference recent code; compact if switching focus |
-| Debugging → Next feature | Yes | Debug traces pollute context for unrelated work |
-| Mid-implementation | No | Losing variable names, file paths, and partial state is costly |
-| After a failed approach | Yes | Clear the dead-end reasoning before trying a new approach |
+## What Persists
 
-## What Survives Compaction
-
-Understanding what persists helps you compact with confidence:
-
-| Persists | Lost |
-|----------|------|
-| AGENTS.md instructions | Intermediate reasoning and analysis |
-| TodoWrite task list | File contents you previously read |
-| Memory files (`~/.codex/memory/`) | Multi-step conversation context |
-| Git state (commits, branches) | Tool call history and counts |
-| Files on disk | Nuanced user preferences stated verbally |
-
-## Best Practices
-
-1. **Compact after planning** — Once plan is finalized in TodoWrite, compact to start fresh
-2. **Compact after debugging** — Clear error-resolution context before continuing
-3. **Don't compact mid-implementation** — Preserve context for related changes
-4. **Read the suggestion** — The hook tells you *when*, you decide *if*
-5. **Write before compacting** — Save important context to files or memory before compacting
-6. **Use `/compact` with a summary** — Add a custom message: `/compact Focus on implementing auth middleware next`
+After compaction, these remain available:
+- `AGENTS.md` instructions
+- Files on disk
+- Git state
+- Any explicitly written notes/todos
 
 ## Related
 
-- [The Longform Guide](https://x.com/affaanmustafa/status/2014040193557471352) — Token optimization section
-- Memory persistence hooks — For state that survives compaction
-- `continuous-learning` skill — Extracts patterns before session ends
+- `continuous-learning-v2` for pattern capture/evolution

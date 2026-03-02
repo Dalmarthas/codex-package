@@ -2,7 +2,7 @@
 # Continuous Learning v2 - Observer Agent Launcher
 #
 # Starts the background observer agent that analyzes observations
-# and creates instincts. Uses Haiku model for cost efficiency.
+# and creates instincts using deterministic mining heuristics.
 #
 # v2.1: Project-scoped — detects current project and analyzes
 #       project-specific observations into project-scoped instincts.
@@ -148,51 +148,14 @@ case "${1:-start}" in
 
         echo "[$(date)] Analyzing $obs_count observations for project ${PROJECT_NAME}..." >> "$LOG_FILE"
 
-        # Use Claude Code with Haiku to analyze observations
-        # The prompt now specifies project-scoped instinct creation
-        if command -v claude &> /dev/null; then
-          exit_code=0
-          claude --model haiku --print \
-            "Read $OBSERVATIONS_FILE and identify patterns for the project '${PROJECT_NAME}'.
-If you find 3+ occurrences of the same pattern, create an instinct file in $INSTINCTS_DIR/ following this format:
-
----
-id: <kebab-case-id>
-trigger: \"<when this happens>\"
-confidence: <0.3-0.9>
-domain: <code-style|testing|git|debugging|workflow|etc>
-source: session-observation
-scope: project
-project_id: ${PROJECT_ID}
-project_name: ${PROJECT_NAME}
----
-
-# <Title>
-
-## Action
-<What to do>
-
-## Evidence
-<What observations led to this>
-
-Be conservative - only create instincts for clear patterns.
-If a pattern seems universal (not project-specific), set scope to 'global' instead of 'project'.
-Examples of global patterns: 'always validate user input', 'prefer explicit error handling'.
-Examples of project patterns: 'use React functional components', 'follow Django REST framework conventions'." \
-            >> "$LOG_FILE" 2>&1 || exit_code=$?
-          if [ "$exit_code" -ne 0 ]; then
-            echo "[$(date)] Claude analysis failed (exit $exit_code)" >> "$LOG_FILE"
-          fi
-        else
-          echo "[$(date)] claude CLI not found, skipping analysis" >> "$LOG_FILE"
-        fi
-
-        # Archive processed observations
-        if [ -f "$OBSERVATIONS_FILE" ]; then
-          archive_dir="${PROJECT_DIR}/observations.archive"
-          mkdir -p "$archive_dir"
-          mv "$OBSERVATIONS_FILE" "$archive_dir/processed-$(date +%Y%m%d-%H%M%S)-$$.jsonl" 2>/dev/null || true
-        fi
+        # Analyze and materialize instincts via Codex-compatible mining.
+        # The mining command handles archiving when successful.
+        python3 "${SKILL_ROOT}/scripts/instinct-cli.py" mine \
+          --min-occurrences 3 \
+          --max-instincts 8 \
+          --archive \
+          >> "$LOG_FILE" 2>&1 || \
+          echo "[$(date)] instinct mining failed (exit $?)" >> "$LOG_FILE"
       }
 
       # Handle SIGUSR1 for on-demand analysis

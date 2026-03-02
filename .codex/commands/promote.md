@@ -10,16 +10,16 @@ Promote instincts from project scope to global scope in continuous-learning-v2.
 
 ## Implementation
 
-Run the instinct CLI using the plugin root path:
+Run the instinct CLI from the current workspace:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/scripts/instinct-cli.py" promote [instinct-id] [--force] [--dry-run]
+python3 .agents/skills/continuous-learning-v2/scripts/instinct-cli.py promote [instinct-id] [--force] [--dry-run]
 ```
 
-Or if `CLAUDE_PLUGIN_ROOT` is not set (manual installation):
+If the skill is installed globally:
 
 ```bash
-python3 ~/.codex/skills/continuous-learning-v2/scripts/instinct-cli.py promote [instinct-id] [--force] [--dry-run]
+python3 ~/.agents/skills/continuous-learning-v2/scripts/instinct-cli.py promote [instinct-id] [--force] [--dry-run]
 ```
 
 ## Usage
@@ -39,4 +39,3 @@ python3 ~/.codex/skills/continuous-learning-v2/scripts/instinct-cli.py promote [
    - Appear in at least 2 projects
    - Meet confidence threshold
 4. Write promoted instincts to `~/.codex/homunculus/instincts/personal/` with `scope: global`
-

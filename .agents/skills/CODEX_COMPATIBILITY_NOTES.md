@@ -2,12 +2,12 @@
 
 All skills from `skills/` were ported to `.agents/skills/` with Codex metadata (`agents/openai.yaml`).
 
-## Partial-support caveat
+## Hook caveat
 Codex does not provide Claude-style hook automation (`PreToolUse`, `PostToolUse`, etc.).
 
-Skills that mention hook setup still work as guidance and manual workflows, but their automatic hook-trigger behavior is partial in Codex.
+For affected skills, this package now includes Codex-native alternatives:
+- `continuous-learning-v2`: `instinct-cli.py observe` + `instinct-cli.py mine`
+- `strategic-compact`: proactive boundary guidance + `suggest-compact.py` helper
+- `security-scan`: Codex workspace scanning workflow (plus legacy-file checks when present)
 
-Common affected areas:
-- continuous learning / observation hooks
-- compact suggestion hooks
-- config/security scanning for legacy `.claude` layouts
+Hook scripts remain optional for runtimes that support them.

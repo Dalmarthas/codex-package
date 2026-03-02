@@ -1,7 +1,7 @@
 interface:
   display_name: "Continuous Learning V2"
-  short_description: "Instinct-based learning system that observes sessions via hooks, creates atomic instincts with confidence scoring, and evolves them into ski"
+  short_description: "Instinct learning for Codex sessions: capture observations, mine repeated patterns, and evolve project-scoped instincts."
   brand_color: "#3B82F6"
-  default_prompt: "Apply the Continuous Learning V2 skill workflow from SKILL.md to this task."
+  default_prompt: "Apply Continuous Learning V2 in Codex-native mode: record key observations, mine patterns into instincts, and use status/evolve/promote commands."
 policy:
   allow_implicit_invocation: true

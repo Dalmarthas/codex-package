@@ -1,165 +1,87 @@
 ---
 name: security-scan
-description: Scan your Claude Code configuration (.codex/ directory) for security vulnerabilities, misconfigurations, and injection risks using AgentShield. Checks AGENTS.md, settings.json, MCP servers, hooks, and agent definitions.
+description: Scan Codex workspace configuration and agent assets for security misconfigurations, injection risks, and secret exposure.
 origin: ECC
 ---
 
 # Security Scan Skill
 
-Audit your Claude Code configuration for security issues using [AgentShield](https://github.com/affaan-m/agentshield).
+Audit Codex configuration and agent assets for security issues.
 
 ## When to Activate
 
-- Setting up a new Claude Code project
-- After modifying `.codex/settings.json`, `AGENTS.md`, or MCP configs
-- Before committing configuration changes
-- When onboarding to a new repository with existing Claude Code configs
-- Periodic security hygiene checks
+- After editing `AGENTS.md` or `.codex/config.toml`
+- After adding/updating `.codex/agents/`, `.codex/commands/`, `.codex/contexts/`, `.codex/rules/`
+- Before committing/pushing infra or automation changes
+- When onboarding into a repository that already has Codex assets
+- As a periodic hygiene check
 
 ## What It Scans
 
-| File | Checks |
+| Path | Checks |
 |------|--------|
-| `AGENTS.md` | Hardcoded secrets, auto-run instructions, prompt injection patterns |
-| `settings.json` | Overly permissive allow lists, missing deny lists, dangerous bypass flags |
-| `mcp.json` | Risky MCP servers, hardcoded env secrets, npx supply chain risks |
-| `hooks/` | Command injection via interpolation, data exfiltration, silent error suppression |
-| `agents/*.md` | Unrestricted tool access, prompt injection surface, missing model specs |
+| `AGENTS.md`, `.codex/AGENTS.md` | Prompt-injection vectors, unsafe auto-run instructions, secret leakage |
+| `.codex/config.toml` | Over-permissive server/tool config, unsafe command defaults |
+| `.codex/agents/`, `.codex/commands/`, `.codex/contexts/`, `.codex/rules/` | Command injection patterns, risky shell examples, missing safety constraints |
+| `.agents/skills/` | Unsafe workflow instructions, secret literals, high-risk copy/paste commands |
+| Legacy config files (if present) | `settings.json`, `mcp.json`, hook scripts, runtime-specific escape hatches |
 
-## Prerequisites
-
-AgentShield must be installed. Check and install if needed:
+## Primary Scanner (AgentShield)
 
 ```bash
-# Check if installed
+# Check availability
 npx ecc-agentshield --version
 
-# Install globally (recommended)
-npm install -g ecc-agentshield
+# Run workspace scan
+npx ecc-agentshield scan --path .
 
-# Or run directly via npx (no install needed)
-npx ecc-agentshield scan .
+# CI-friendly JSON
+npx ecc-agentshield scan --path . --format json --min-severity medium
+
+# Safe auto-fixes only
+npx ecc-agentshield scan --path . --fix
 ```
 
-## Usage
+## Codex-Focused Manual Checks
 
-### Basic Scan
-
-Run against the current project's `.codex/` directory:
+Run these even if AgentShield is unavailable:
 
 ```bash
-# Scan current project
-npx ecc-agentshield scan
+# Potential secrets
+rg -n "(sk-[A-Za-z0-9]{10,}|api[_-]?key|secret|token|password)" AGENTS.md .codex .agents --hidden
 
-# Scan a specific path
-npx ecc-agentshield scan --path /path/to/.codex
+# Dangerous shell patterns in docs/scripts
+rg -n "curl\s+.*\|\s*(bash|sh)|sudo\s+|chmod\s+777|rm\s+-rf\s+/" .codex .agents --hidden
 
-# Scan with minimum severity filter
-npx ecc-agentshield scan --min-severity medium
+# Prompt-injection style directives
+rg -n "ignore previous|bypass|disable security|run without confirmation" AGENTS.md .codex .agents --hidden
+
+# Review modified files before push
+git diff -- . ':!node_modules'
 ```
 
-### Output Formats
+## Severity Guidance
 
-```bash
-# Terminal output (default) — colored report with grade
-npx ecc-agentshield scan
+- Critical: hardcoded credentials, unrestricted remote shell execution
+- High: broad trust or bypass directives in agent/command docs
+- Medium: unsafe examples without guardrails, missing validation steps
+- Low/Info: clarity and hardening opportunities
 
-# JSON — for CI/CD integration
-npx ecc-agentshield scan --format json
+## Remediation Workflow
 
-# Markdown — for documentation
-npx ecc-agentshield scan --format markdown
+1. Fix critical/high findings first.
+2. Re-run scan until no critical/high remain.
+3. Document accepted medium/low risk in commit notes.
+4. Re-check with `git diff` before commit.
 
-# HTML — self-contained dark-theme report
-npx ecc-agentshield scan --format html > security-report.html
-```
-
-### Auto-Fix
-
-Apply safe fixes automatically (only fixes marked as auto-fixable):
-
-```bash
-npx ecc-agentshield scan --fix
-```
-
-This will:
-- Replace hardcoded secrets with environment variable references
-- Tighten wildcard permissions to scoped alternatives
-- Never modify manual-only suggestions
-
-### Opus 4.6 Deep Analysis
-
-Run the adversarial three-agent pipeline for deeper analysis:
-
-```bash
-# Requires ANTHROPIC_API_KEY
-export ANTHROPIC_API_KEY=your-key
-npx ecc-agentshield scan --opus --stream
-```
-
-This runs:
-1. **Attacker (Red Team)** — finds attack vectors
-2. **Defender (Blue Team)** — recommends hardening
-3. **Auditor (Final Verdict)** — synthesizes both perspectives
-
-### Initialize Secure Config
-
-Scaffold a new secure `.codex/` configuration from scratch:
-
-```bash
-npx ecc-agentshield init
-```
-
-Creates:
-- `settings.json` with scoped permissions and deny list
-- `AGENTS.md` with security best practices
-- `mcp.json` placeholder
-
-### GitHub Action
-
-Add to your CI pipeline:
+## CI Example
 
 ```yaml
-- uses: affaan-m/agentshield@v1
-  with:
-    path: '.'
-    min-severity: 'medium'
-    fail-on-findings: true
+- name: AgentShield
+  run: npx ecc-agentshield scan --path . --min-severity medium --format json
 ```
-
-## Severity Levels
-
-| Grade | Score | Meaning |
-|-------|-------|---------|
-| A | 90-100 | Secure configuration |
-| B | 75-89 | Minor issues |
-| C | 60-74 | Needs attention |
-| D | 40-59 | Significant risks |
-| F | 0-39 | Critical vulnerabilities |
-
-## Interpreting Results
-
-### Critical Findings (fix immediately)
-- Hardcoded API keys or tokens in config files
-- `Bash(*)` in the allow list (unrestricted shell access)
-- Command injection in hooks via `${file}` interpolation
-- Shell-running MCP servers
-
-### High Findings (fix before production)
-- Auto-run instructions in AGENTS.md (prompt injection vector)
-- Missing deny lists in permissions
-- Agents with unnecessary Bash access
-
-### Medium Findings (recommended)
-- Silent error suppression in hooks (`2>/dev/null`, `|| true`)
-- Missing PreToolUse security hooks
-- `npx -y` auto-install in MCP server configs
-
-### Info Findings (awareness)
-- Missing descriptions on MCP servers
-- Prohibitive instructions correctly flagged as good practice
 
 ## Links
 
-- **GitHub**: [github.com/affaan-m/agentshield](https://github.com/affaan-m/agentshield)
-- **npm**: [npmjs.com/package/ecc-agentshield](https://www.npmjs.com/package/ecc-agentshield)
+- [AgentShield GitHub](https://github.com/affaan-m/agentshield)
+- [AgentShield npm](https://www.npmjs.com/package/ecc-agentshield)

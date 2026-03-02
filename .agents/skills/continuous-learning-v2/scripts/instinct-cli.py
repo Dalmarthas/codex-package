@@ -6,6 +6,8 @@ v2.1: Project-scoped instincts — different projects get different instincts,
       with global instincts applied universally.
 
 Commands:
+  observe  - Record a single observation (manual checkpoint or hook payload)
+  mine     - Convert repeated observations into instincts (Codex-native flow)
   status   - Show all instincts (project + global) and their status
   import   - Import instincts from file or URL
   export   - Export instincts to file
@@ -31,7 +33,12 @@ from typing import Optional
 # Configuration
 # ─────────────────────────────────────────────
 
-HOMUNCULUS_DIR = Path.home() / ".codex" / "homunculus"
+HOMUNCULUS_DIR = Path(
+    os.environ.get(
+        "CODEX_HOMUNCULUS_DIR",
+        str(Path.home() / ".codex" / "homunculus"),
+    )
+).expanduser()
 PROJECTS_DIR = HOMUNCULUS_DIR / "projects"
 REGISTRY_FILE = HOMUNCULUS_DIR / "projects.json"
 
@@ -42,10 +49,11 @@ GLOBAL_INHERITED_DIR = GLOBAL_INSTINCTS_DIR / "inherited"
 GLOBAL_EVOLVED_DIR = HOMUNCULUS_DIR / "evolved"
 GLOBAL_OBSERVATIONS_FILE = HOMUNCULUS_DIR / "observations.jsonl"
 
-# Thresholds for auto-promotion
+# Thresholds for auto-promotion / mining
 PROMOTE_CONFIDENCE_THRESHOLD = 0.8
 PROMOTE_MIN_PROJECTS = 2
 ALLOWED_INSTINCT_EXTENSIONS = (".yaml", ".yml", ".md")
+MINE_MAX_EVIDENCE_LINES = 5
 
 # Ensure global directories exist (deferred to avoid side effects at import time)
 def _ensure_global_dirs():
@@ -107,8 +115,8 @@ def detect_project() -> dict:
     """Detect current project context. Returns dict with id, name, root, project_dir."""
     project_root = None
 
-    # 1. CLAUDE_PROJECT_DIR env var
-    env_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    # 1. Explicit env var (Codex-first, Claude-compatible fallback)
+    env_dir = os.environ.get("CODEX_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR")
     if env_dir and os.path.isdir(env_dir):
         project_root = env_dir
 
@@ -332,6 +340,370 @@ def load_project_only_instincts(project: dict) -> list[dict]:
         instincts += _load_instincts_from_dir(GLOBAL_INHERITED_DIR, "inherited", "global")
         return instincts
     return load_all_instincts(project, include_global=False)
+
+
+# ─────────────────────────────────────────────
+# Observation + Mining (Codex-native path)
+# ─────────────────────────────────────────────
+
+def _truncate(value, limit: int = 5000) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value)
+    else:
+        text = str(value)
+    return text[:limit]
+
+
+def _parse_json_maybe(value):
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if not stripped or stripped[0] not in "{[":
+        return value
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return value
+
+
+def _extract_bash_command(observation: dict) -> str:
+    tool = (observation.get("tool") or "").lower()
+    if tool not in {"bash", "shell", "terminal"}:
+        return ""
+
+    raw_input = _parse_json_maybe(observation.get("input"))
+    if isinstance(raw_input, dict):
+        for key in ("command", "cmd", "script", "input"):
+            value = raw_input.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+    if isinstance(raw_input, str):
+        return raw_input.strip()
+    return ""
+
+
+def _load_observations(observations_file: Path, limit: Optional[int] = None) -> list[dict]:
+    observations: list[dict] = []
+    if not observations_file.exists():
+        return observations
+
+    with observations_file.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                observations.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    if limit and limit > 0 and len(observations) > limit:
+        return observations[-limit:]
+    return observations
+
+
+def _count_pattern(observations: list[dict], first_pred, second_pred, window: int) -> tuple[int, list[str]]:
+    count = 0
+    evidence: list[str] = []
+
+    for i, first in enumerate(observations):
+        if not first_pred(first):
+            continue
+        max_j = min(len(observations), i + 1 + window)
+        for j in range(i + 1, max_j):
+            second = observations[j]
+            if second_pred(second):
+                count += 1
+                if len(evidence) < MINE_MAX_EVIDENCE_LINES:
+                    first_tool = first.get("tool", "unknown")
+                    second_tool = second.get("tool", "unknown")
+                    evidence.append(f"{first_tool} -> {second_tool}")
+                break
+
+    return count, evidence
+
+
+def _confidence_from_count(count: int) -> float:
+    # 3 occurrences starts at 0.5 confidence and climbs to 0.9.
+    return round(min(0.9, 0.2 + (0.1 * count)), 2)
+
+
+def _render_instinct_content(action: str, evidence: list[str], count: int) -> str:
+    lines = [
+        "## Action",
+        action,
+        "",
+        "## Evidence",
+        f"Observed {count} repeated workflow matches.",
+    ]
+    for sample in evidence:
+        lines.append(f"- {sample}")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _write_instinct(project: dict, instinct: dict, dry_run: bool = False) -> tuple[str, Path]:
+    scope = instinct.get("scope", "project")
+    output_dir = GLOBAL_PERSONAL_DIR if scope == "global" else project["instincts_personal"]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"{instinct['id']}.yaml"
+
+    existing_conf = None
+    if output_file.exists():
+        try:
+            parsed = parse_instinct_file(output_file.read_text())
+            if parsed and parsed[0].get("confidence") is not None:
+                existing_conf = float(parsed[0]["confidence"])
+        except Exception:
+            existing_conf = None
+
+    confidence = float(instinct.get("confidence", 0.5))
+    if existing_conf is not None:
+        confidence = max(confidence, existing_conf)
+
+    trigger = json.dumps(instinct.get("trigger", "unknown"))
+    output = "---\n"
+    output += f"id: {instinct['id']}\n"
+    output += f"trigger: {trigger}\n"
+    output += f"confidence: {confidence}\n"
+    output += f"domain: {instinct.get('domain', 'workflow')}\n"
+    output += f"source: {instinct.get('source', 'session-observation-mined')}\n"
+    output += f"scope: {scope}\n"
+    if scope == "project":
+        output += f"project_id: {project['id']}\n"
+        output += f"project_name: {project['name']}\n"
+    output += f"updated_at: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}\n"
+    output += "---\n\n"
+    output += instinct.get("content", "").strip() + "\n"
+
+    status = "updated" if output_file.exists() else "created"
+    if dry_run:
+        return f"dry-run {status}", output_file
+
+    output_file.write_text(output)
+    return status, output_file
+
+
+def _archive_observations(project: dict, observations_file: Path) -> Optional[Path]:
+    if not observations_file.exists():
+        return None
+    if project.get("id") == "global":
+        archive_dir = HOMUNCULUS_DIR / "observations.archive"
+    else:
+        archive_dir = project["project_dir"] / "observations.archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    archived = archive_dir / f"processed-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{os.getpid()}.jsonl"
+    observations_file.replace(archived)
+    return archived
+
+
+def cmd_observe(args) -> int:
+    """Record one observation entry (manual or hook payload)."""
+    project = detect_project()
+    project_context = project
+    if args.scope == "global":
+        project_context = {
+            "id": "global",
+            "name": "global",
+            "observations_file": GLOBAL_OBSERVATIONS_FILE,
+            "instincts_personal": GLOBAL_PERSONAL_DIR,
+            "project_dir": HOMUNCULUS_DIR,
+        }
+
+    if args.from_hook:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            print("No hook payload on stdin.", file=sys.stderr)
+            return 1
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(f"Invalid hook JSON: {exc}", file=sys.stderr)
+            return 1
+
+        event = "tool_start" if args.phase == "pre" else "tool_complete"
+        tool = data.get("tool_name", data.get("tool", "unknown"))
+        tool_input = _truncate(data.get("tool_input", data.get("input", {})))
+        tool_output = _truncate(data.get("tool_output", data.get("output", "")))
+        session_id = data.get("session_id", "unknown")
+        cwd = data.get("cwd", "")
+        tool_use_id = data.get("tool_use_id", "")
+    else:
+        event = args.event
+        tool = args.tool
+        tool_input = _truncate(args.input)
+        tool_output = _truncate(args.output)
+        session_id = args.session
+        cwd = args.cwd or os.getcwd()
+        tool_use_id = args.tool_use_id
+
+    observation = {
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "event": event,
+        "tool": tool,
+        "session": session_id,
+        "project_id": project_context["id"],
+        "project_name": project_context["name"],
+    }
+    if tool_input:
+        observation["input"] = tool_input
+    if tool_output is not None and tool_output != "":
+        observation["output"] = tool_output
+    if cwd:
+        observation["cwd"] = cwd
+    if tool_use_id:
+        observation["tool_use_id"] = tool_use_id
+
+    observations_file = Path(project_context["observations_file"])
+    observations_file.parent.mkdir(parents=True, exist_ok=True)
+    with observations_file.open("a") as f:
+        f.write(json.dumps(observation) + "\n")
+
+    if not args.quiet:
+        print(
+            f"Recorded observation: {event} ({tool}) -> {observations_file} "
+            f"[{project_context['name']}]"
+        )
+    return 0
+
+
+def cmd_mine(args) -> int:
+    """Mine repeated observation patterns into instincts."""
+    project = detect_project()
+    scope = args.scope
+    if scope == "auto":
+        scope = "project" if project.get("id") != "global" else "global"
+
+    project_for_archive = project
+    observations_file = Path(project["observations_file"])
+    if scope == "global":
+        observations_file = GLOBAL_OBSERVATIONS_FILE
+        project_for_archive = {
+            "id": "global",
+            "project_dir": HOMUNCULUS_DIR,
+        }
+    observations = _load_observations(observations_file, limit=args.limit)
+    if not observations:
+        print(f"No observations found at {observations_file}.")
+        return 0
+
+    def tool_is(*names):
+        lowered = {n.lower() for n in names}
+        return lambda obs: (obs.get("tool") or "").lower() in lowered
+
+    def bash_has(*needles):
+        lowered = tuple(n.lower() for n in needles)
+
+        def _pred(obs):
+            cmd = _extract_bash_command(obs).lower()
+            return bool(cmd) and any(n in cmd for n in lowered)
+
+        return _pred
+
+    is_read_like = tool_is("Read", "View")
+    is_edit_like = tool_is("Edit", "Write", "MultiEdit")
+    is_search_tool = tool_is("Grep", "Glob")
+    is_search_bash = bash_has(" rg ", "grep ")
+    is_search_like = lambda obs: is_search_tool(obs) or is_search_bash(obs)
+    is_test_cmd = bash_has(" test", "pytest", "vitest", "jest", "go test", "cargo test")
+    is_git_review_cmd = bash_has("git diff", "git status", "git show")
+
+    candidates = []
+
+    count, evidence = _count_pattern(observations, is_read_like, is_edit_like, window=5)
+    if count >= args.min_occurrences:
+        candidates.append({
+            "id": "read-before-edit",
+            "trigger": "when modifying existing code",
+            "domain": "workflow",
+            "action": "Read related files before editing to reduce blind changes.",
+            "count": count,
+            "evidence": evidence,
+        })
+
+    count, evidence = _count_pattern(observations, is_search_like, is_edit_like, window=6)
+    if count >= args.min_occurrences:
+        candidates.append({
+            "id": "search-before-edit",
+            "trigger": "when code ownership or callsites are unclear",
+            "domain": "workflow",
+            "action": "Run a project-wide search before editing to understand impact.",
+            "count": count,
+            "evidence": evidence,
+        })
+
+    count, evidence = _count_pattern(observations, is_edit_like, is_test_cmd, window=8)
+    if count >= args.min_occurrences:
+        candidates.append({
+            "id": "run-tests-after-edit",
+            "trigger": "after code changes",
+            "domain": "testing",
+            "action": "Run targeted tests after edits before declaring completion.",
+            "count": count,
+            "evidence": evidence,
+        })
+
+    count, evidence = _count_pattern(observations, is_edit_like, is_git_review_cmd, window=10)
+    if count >= args.min_occurrences:
+        candidates.append({
+            "id": "review-diff-before-finish",
+            "trigger": "before completing an implementation chunk",
+            "domain": "git",
+            "action": "Review `git diff`/`git status` before finalizing work.",
+            "count": count,
+            "evidence": evidence,
+        })
+
+    if not candidates:
+        print(
+            "No repeatable patterns met the mining threshold. "
+            f"Need >= {args.min_occurrences} occurrences."
+        )
+        return 0
+
+    # Keep strongest candidates first, then cap if requested.
+    candidates.sort(key=lambda c: (-c["count"], c["id"]))
+    if args.max_instincts:
+        candidates = candidates[:args.max_instincts]
+
+    written = []
+    for cand in candidates:
+        instinct = {
+            "id": cand["id"],
+            "trigger": cand["trigger"],
+            "confidence": _confidence_from_count(cand["count"]),
+            "domain": cand["domain"],
+            "scope": scope,
+            "source": "session-observation-mined",
+            "content": _render_instinct_content(cand["action"], cand["evidence"], cand["count"]),
+        }
+        if not _validate_instinct_id(instinct["id"]):
+            print(f"Skipping invalid mined instinct id: {instinct['id']}", file=sys.stderr)
+            continue
+
+        status, path = _write_instinct(project, instinct, dry_run=args.dry_run)
+        written.append((instinct, status, path))
+
+    if not written:
+        print("No instincts were written.")
+        return 0
+
+    print(f"Mined {len(written)} instinct(s) from {len(observations)} observations:")
+    for inst, status, path in written:
+        print(
+            f"  - {inst['id']} ({inst['confidence']:.0%}, {inst['domain']}, "
+            f"scope={inst['scope']}) [{status}] -> {path}"
+        )
+
+    if args.archive and not args.dry_run:
+        archived = _archive_observations(project_for_archive, observations_file)
+        if archived:
+            print(f"Archived observations to {archived}")
+
+    return 0
 
 
 # ─────────────────────────────────────────────
@@ -965,7 +1337,7 @@ def cmd_projects(args) -> int:
 
     if not registry:
         print("No projects registered yet.")
-        print("Projects are auto-detected when you use Claude Code in a git repo.")
+        print("Projects are auto-detected when you use this CLI in a git repo.")
         return 0
 
     print(f"\n{'='*60}")
@@ -1088,9 +1460,44 @@ def _generate_evolved(skill_candidates: list, workflow_instincts: list, agent_ca
 # ─────────────────────────────────────────────
 
 def main() -> int:
-    _ensure_global_dirs()
-    parser = argparse.ArgumentParser(description='Instinct CLI for Continuous Learning v2.1 (Project-Scoped)')
+    parser = argparse.ArgumentParser(description='Instinct CLI for Continuous Learning v2.2 (Codex-compatible)')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
+
+    # Observe (Codex-native/manual capture)
+    observe_parser = subparsers.add_parser('observe', help='Record an observation')
+    observe_parser.add_argument('--from-hook', action='store_true',
+                                help='Read hook payload JSON from stdin')
+    observe_parser.add_argument('--phase', choices=['pre', 'post'], default='post',
+                                help='Hook phase when using --from-hook (default: post)')
+    observe_parser.add_argument('--event', default='checkpoint',
+                                help='Manual event name (default: checkpoint)')
+    observe_parser.add_argument('--tool', default='manual-checkpoint',
+                                help='Tool label for manual observations')
+    observe_parser.add_argument('--input', help='Input payload (manual mode)')
+    observe_parser.add_argument('--output', help='Output payload (manual mode)')
+    observe_parser.add_argument('--session', default='manual',
+                                help='Session identifier (manual mode)')
+    observe_parser.add_argument('--cwd', help='Working directory for the observation')
+    observe_parser.add_argument('--tool-use-id', default='',
+                                help='Optional tool-use ID')
+    observe_parser.add_argument('--scope', choices=['auto', 'global'], default='auto',
+                                help='Write observation to auto-detected project or global')
+    observe_parser.add_argument('--quiet', action='store_true', help='Suppress success output')
+
+    # Mine (convert observations -> instincts)
+    mine_parser = subparsers.add_parser('mine', help='Mine repeated observations into instincts')
+    mine_parser.add_argument('--min-occurrences', type=int, default=3,
+                             help='Minimum repeated pattern count to create an instinct (default: 3)')
+    mine_parser.add_argument('--limit', type=int, default=2000,
+                             help='Analyze only the most recent N observations (default: 2000)')
+    mine_parser.add_argument('--max-instincts', type=int, default=8,
+                             help='Maximum instincts to emit per run (default: 8)')
+    mine_parser.add_argument('--scope', choices=['auto', 'project', 'global'], default='auto',
+                             help='Scope for mined instincts (default: auto)')
+    mine_parser.add_argument('--archive', action='store_true',
+                             help='Archive processed observations after successful mining')
+    mine_parser.add_argument('--dry-run', action='store_true',
+                             help='Show what would be written without changes')
 
     # Status
     status_parser = subparsers.add_parser('status', help='Show instinct status (project + global)')
@@ -1127,7 +1534,28 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    if args.command == 'status':
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    try:
+        _ensure_global_dirs()
+    except PermissionError:
+        print(
+            "Cannot initialize instinct storage at "
+            f"'{HOMUNCULUS_DIR}'. Set CODEX_HOMUNCULUS_DIR to a writable path.",
+            file=sys.stderr,
+        )
+        return 1
+    except OSError as exc:
+        print(f"Failed to initialize instinct storage: {exc}", file=sys.stderr)
+        return 1
+
+    if args.command == 'observe':
+        return cmd_observe(args)
+    elif args.command == 'mine':
+        return cmd_mine(args)
+    elif args.command == 'status':
         return cmd_status(args)
     elif args.command == 'import':
         return cmd_import(args)
@@ -1139,9 +1567,8 @@ def main() -> int:
         return cmd_promote(args)
     elif args.command == 'projects':
         return cmd_projects(args)
-    else:
-        parser.print_help()
-        return 1
+    parser.print_help()
+    return 1
 
 
 if __name__ == '__main__':

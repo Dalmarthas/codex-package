@@ -8,16 +8,23 @@ command: true
 
 ## Implementation
 
-Run the instinct CLI using the plugin root path:
+Run the instinct CLI from the current workspace:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/scripts/instinct-cli.py" evolve [--generate]
+python3 .agents/skills/continuous-learning-v2/scripts/instinct-cli.py evolve [--generate]
 ```
 
-Or if `CLAUDE_PLUGIN_ROOT` is not set (manual installation):
+If the skill is installed globally:
 
 ```bash
-python3 ~/.codex/skills/continuous-learning-v2/scripts/instinct-cli.py evolve [--generate]
+python3 ~/.agents/skills/continuous-learning-v2/scripts/instinct-cli.py evolve [--generate]
+```
+
+Optional prep (Codex-native observation flow):
+
+```bash
+python3 .agents/skills/continuous-learning-v2/scripts/instinct-cli.py observe --event checkpoint --tool task --input "phase summary"
+python3 .agents/skills/continuous-learning-v2/scripts/instinct-cli.py mine
 ```
 
 Analyzes instincts and clusters related ones into higher-level structures:

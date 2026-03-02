@@ -2,13 +2,13 @@
 # Continuous Learning v2 - Observation Hook
 #
 # Captures tool use events for pattern analysis.
-# Claude Code passes hook data via stdin as JSON.
+# Hook-capable runtimes pass hook payloads via stdin as JSON.
 #
 # v2.1: Project-scoped observations — detects current project context
 #       and writes observations to project-specific directory.
 #
-# Registered via plugin hooks/hooks.json (auto-loaded when plugin is enabled).
-# Can also be registered manually in ~/.codex/settings.json.
+# Optional helper for hook-capable runtimes.
+# Codex-native manual capture is available via instinct-cli.py observe.
 
 set -e
 
@@ -19,7 +19,7 @@ HOOK_PHASE="${1:-post}"
 # Read stdin first (before project detection)
 # ─────────────────────────────────────────────
 
-# Read JSON from stdin (Claude Code hook format)
+# Read JSON from stdin (hook payload format)
 INPUT_JSON=$(cat)
 
 # Exit if no input
@@ -45,6 +45,7 @@ except(KeyError, TypeError, ValueError):
 
 # If cwd was provided in stdin, use it for project detection
 if [ -n "$STDIN_CWD" ] && [ -d "$STDIN_CWD" ]; then
+  export CODEX_PROJECT_DIR="$STDIN_CWD"
   export CLAUDE_PROJECT_DIR="$STDIN_CWD"
 fi
 
@@ -73,7 +74,7 @@ if [ -f "$CONFIG_DIR/disabled" ]; then
 fi
 
 # Parse using python via stdin pipe (safe for all JSON payloads)
-# Pass HOOK_PHASE via env var since Claude Code does not include hook type in stdin JSON
+# Pass HOOK_PHASE via env var for runtimes that omit hook type in payload JSON.
 PARSED=$(echo "$INPUT_JSON" | HOOK_PHASE="$HOOK_PHASE" python3 -c '
 import json
 import sys
@@ -83,12 +84,12 @@ try:
     data = json.load(sys.stdin)
 
     # Determine event type from CLI argument passed via env var.
-    # Claude Code does NOT include a "hook_type" field in the stdin JSON,
-    # so we rely on the shell argument ("pre" or "post") instead.
+    # Some runtimes do NOT include a "hook_type" field in stdin JSON,
+    # so we rely on the shell argument ("pre" or "post").
     hook_phase = os.environ.get("HOOK_PHASE", "post")
     event = "tool_start" if hook_phase == "pre" else "tool_complete"
 
-    # Extract fields - Claude Code hook format
+    # Extract fields - generic hook payload format
     tool_name = data.get("tool_name", data.get("tool", "unknown"))
     tool_input = data.get("tool_input", data.get("input", {}))
     tool_output = data.get("tool_output", data.get("output", ""))

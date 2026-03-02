@@ -1,7 +1,7 @@
 interface:
   display_name: "Strategic Compact"
-  short_description: "Context management via strategic compaction"
+  short_description: "Suggest `/compact` at logical task boundaries to keep long Codex sessions coherent."
   brand_color: "#14B8A6"
-  default_prompt: "Suggest task boundary compaction for context management"
+  default_prompt: "Apply strategic compaction guidance: recommend `/compact` only at true phase boundaries and avoid mid-implementation suggestions."
 policy:
   allow_implicit_invocation: true

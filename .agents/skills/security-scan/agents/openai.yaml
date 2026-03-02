@@ -1,7 +1,7 @@
 interface:
   display_name: "Security Scan"
-  short_description: "Scan your Claude Code configuration (.codex/ directory) for security vulnerabilities, misconfigurations, and injection risks using AgentShi"
+  short_description: "Scan Codex configs, skills, and command assets for security risks using AgentShield and targeted manual checks."
   brand_color: "#3B82F6"
-  default_prompt: "Apply the Security Scan skill workflow from SKILL.md to this task."
+  default_prompt: "Run the Security Scan workflow for this Codex workspace and report prioritized findings with concrete remediation."
 policy:
   allow_implicit_invocation: true
