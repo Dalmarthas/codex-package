@@ -1,7 +1,0 @@
-interface:
-  display_name: "Continuous Learning V2"
-  short_description: "Instinct-based learning system that observes sessions via hooks, creates atomic instincts with confidence scoring, and evolves them into ski"
-  brand_color: "#3B82F6"
-  default_prompt: "Apply the Continuous Learning V2 skill workflow from SKILL.md to this task."
-policy:
-  allow_implicit_invocation: true

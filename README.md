@@ -1,35 +1,26 @@
-# Codex Package (Codex-Only Branch)
+# Codex Noncoder Agents Package
 
-This repository branch contains only the assets prepared for Codex use.
+This repository branch contains non-coding skills prepared for Codex use.
 
 ## Included
 
-- `.agents/skills/` — 56 Codex-usable skills (each with `agents/openai.yaml` metadata)
-- `.codex/` — Codex resource packs:
-  - `agents/`
-  - `commands/`
-  - `contexts/`
-  - `examples/`
-  - `rules/`
-  - `scripts/`
-  - `tests/`
-  - `AGENTS.md`
-  - `config.toml`
-  - `TRANSFER_REPORT.md`
-- Root docs:
-  - `AGENTS.md`
-  - `README-CODEX-TRANSFER.md`
+- `.agents/skills/` — 6 non-coding skills (each with `agents/openai.yaml` metadata):
+  - `article-writing`
+  - `content-engine`
+  - `investor-materials`
+  - `investor-outreach`
+  - `market-research`
+  - `visa-doc-translate`
+- Root docs: `AGENTS.md`, `README-CODEX-TRANSFER.md`
 
 ## Quick Start
 
 1. Clone the repo.
-2. Checkout branch `codex/codex-only`.
+2. Checkout branch `codex/codex-noncoderagents`.
 3. Run Codex from this repository root.
 4. Use skills from `.agents/skills/`.
-5. Use playbooks from `.codex/commands/`, `.codex/agents/`, and `.codex/contexts/`.
 
 ## Notes
 
 - This branch intentionally excludes Claude/Cursor/OpenCode runtime assets.
-- Some skills originally designed around hook automation are preserved as guidance-first workflows in Codex.
-- See `.codex/TRANSFER_REPORT.md` for transfer details.
+- This branch is intentionally focused on writing/research/investor workflows rather than software implementation.

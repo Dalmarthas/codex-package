@@ -1,21 +1,18 @@
-# Codex Package — AGENTS
+# Codex Noncoder Agents — AGENTS
 
-This branch is a Codex-only package.
+This branch is the non-coding Codex skill package.
 
 ## Primary Paths
 
 - Skills: `.agents/skills/`
-- Codex config and references: `.codex/`
-- Transfer details: `.codex/TRANSFER_REPORT.md`
-- Compatibility caveats: `.agents/skills/CODEX_COMPATIBILITY_NOTES.md`
 
 ## How to Use
 
 1. Use `SKILL.md` files under `.agents/skills/` as the primary skill source.
-2. Use `.codex/commands/`, `.codex/agents/`, `.codex/contexts/`, and `.codex/rules/` as reusable playbooks.
-3. Prefer `.codex/config.toml` conventions when setting local Codex config.
+2. Invoke these skills for research/content/investor tasks.
+3. Keep coding/project-implementation skills in the `codex/codex-only` branch.
 
 ## Notes
 
 - This repo intentionally excludes Claude/Cursor/OpenCode runtime assets.
-- Some skills still describe hook-driven flows; in Codex these are guidance-first workflows, not guaranteed automatic hooks.
+- Included skills: `article-writing`, `content-engine`, `investor-materials`, `investor-outreach`, `market-research`, `visa-doc-translate`.
