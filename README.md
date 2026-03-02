@@ -19,6 +19,7 @@ This repository branch contains only the assets prepared for Codex use.
 - Root docs:
   - `AGENTS.md`
   - `README-CODEX-TRANSFER.md`
+  - `FETCH_PROMPT_INSTALL.md`
 
 ## Quick Start
 
@@ -27,6 +28,7 @@ This repository branch contains only the assets prepared for Codex use.
 3. Run Codex from this repository root.
 4. Use skills from `.agents/skills/`.
 5. Use playbooks from `.codex/commands/`, `.codex/agents/`, and `.codex/contexts/`.
+6. Use `FETCH_PROMPT_INSTALL.md` for reusable install command + bootstrap prompt.
 
 ## Notes
 
