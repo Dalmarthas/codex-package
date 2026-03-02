@@ -59,3 +59,15 @@ Since Codex lacks hooks, security enforcement is instruction-based:
 3. Run `npm audit` / `pip audit` before committing
 4. Review `git diff` before every push
 5. Use `sandbox_mode = "workspace-write"` in config
+
+## Codex Resource Packs
+
+Additional Codex-oriented resources are available under `.codex/`:
+- `.codex/agents/` — agent prompt playbooks
+- `.codex/commands/` — command workflow playbooks adapted for Codex use
+- `.codex/contexts/` — reusable context templates
+- `.codex/examples/` — AGENTS examples for common project types
+- `.codex/rules/` — non-hook rule references
+- `.codex/scripts/` and `.codex/tests/` — validator/codemap utilities
+
+Porting details and exclusions are documented in `.codex/TRANSFER_REPORT.md`.
