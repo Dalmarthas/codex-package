@@ -18,6 +18,15 @@ This skill ensures all code follows security best practices and identifies poten
 - Storing or transmitting sensitive data
 - Integrating third-party APIs
 
+## When Not to Activate
+
+- Repository config/prompt/agent-policy audits with no code-path changes (use `security-scan`)
+
+## Conflict Guardrails
+
+- `security-review` drives code-level secure design and implementation.
+- `security-scan` complements it as a pre-merge/push gate for workspace and policy assets.
+
 ## Security Checklist
 
 ### 1. Secrets Management

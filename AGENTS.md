@@ -6,6 +6,7 @@ This branch is a Codex-only package.
 
 - Skills: `.agents/skills/`
 - Codex config and references: `.codex/`
+- Skill conflict policy: `.codex/SKILL_PRECEDENCE.md`
 - Transfer details: `.codex/TRANSFER_REPORT.md`
 - Compatibility caveats: `.agents/skills/CODEX_COMPATIBILITY_NOTES.md`
 

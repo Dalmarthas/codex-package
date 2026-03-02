@@ -1,7 +1,7 @@
 interface:
   display_name: "Search First"
-  short_description: "Research-before-coding workflow. Search for existing tools, libraries, and patterns before writing custom code. Invokes the researcher agent"
+  short_description: "Discovery-phase driver for unresolved dependency/architecture choices before net-new implementation."
   brand_color: "#3B82F6"
-  default_prompt: "Apply the Search First skill workflow from SKILL.md to this task."
+  default_prompt: "Use Search First only during discovery; once approach is selected, hand off to implementation skills (for example TDD workflow)."
 policy:
   allow_implicit_invocation: true

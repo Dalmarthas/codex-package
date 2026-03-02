@@ -30,6 +30,15 @@ When this skill is active, proactively suggest `/compact` when both are true:
 
 Do **not** suggest compaction mid-implementation unless context quality is clearly degrading.
 
+## Conflict Guardrails
+
+- `strategic-compact` is advisory only; it must never force a phase switch.
+- Do not suggest compaction during:
+  - active red/green TDD cycles
+  - active debugging on a reproducing failure
+  - incomplete security/verification checkpoints
+- Preferred timing: immediately after a completed milestone hand-off.
+
 ## Optional Counter Helper
 
 Use the included helper to track tool checkpoints and prompt reminders:

@@ -17,6 +17,8 @@ Skills are auto-loaded from `.agents/skills/`. Each skill contains:
 - `SKILL.md` — Detailed instructions and workflow
 - `agents/openai.yaml` — Codex interface metadata
 
+When multiple skills apply, resolve collisions using `.codex/SKILL_PRECEDENCE.md`.
+
 Available skills:
 - tdd-workflow — Test-driven development with 80%+ coverage
 - security-review — Comprehensive security checklist

@@ -1,12 +1,12 @@
 ---
 name: verification-loop
-description: "A comprehensive verification system for Claude Code sessions."
+description: Use at milestone boundaries (pre-commit/pre-push/PR) to verify build, types, lint, tests, and security readiness in Codex workflows.
 origin: ECC
 ---
 
 # Verification Loop Skill
 
-A comprehensive verification system for Claude Code sessions.
+A comprehensive verification system for Codex sessions.
 
 ## When to Use
 
@@ -15,6 +15,17 @@ Invoke this skill:
 - Before creating a PR
 - When you want to ensure quality gates pass
 - After refactoring
+
+## When Not to Use
+
+- During active red/green TDD micro-cycles (use `tdd-workflow` as the driver)
+- During initial exploration where implementation has not started (use `search-first`)
+- As a replacement for config/prompt security audits (use `security-scan` for that scope)
+
+## Conflict Guardrails
+
+- `verification-loop` is a readiness gate, not an implementation driver.
+- If both `tdd-workflow` and `verification-loop` apply, defer verification-loop until a logical checkpoint.
 
 ## Verification Phases
 

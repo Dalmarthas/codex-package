@@ -1,6 +1,6 @@
 ---
 name: search-first
-description: Research-before-coding workflow. Search for existing tools, libraries, and patterns before writing custom code. Invokes the researcher agent.
+description: Use before net-new implementation when dependency or architecture choices are unresolved; research existing solutions before writing custom code.
 origin: ECC
 ---
 
@@ -15,6 +15,16 @@ Use this skill when:
 - Adding a dependency or integration
 - The user asks "add X functionality" and you're about to write code
 - Before creating a new utility, helper, or abstraction
+
+Do not use this skill for:
+- Small, local edits where the solution is already known in-repo
+- Final readiness checks (use `verification-loop`)
+- Mid red/green cycle interruptions (stay in `tdd-workflow`)
+
+## Conflict Guardrails
+
+- If `search-first` and `tdd-workflow` both apply, `search-first` drives only until a concrete approach is chosen.
+- After approach selection, switch driver to `tdd-workflow`.
 
 ## Workflow
 

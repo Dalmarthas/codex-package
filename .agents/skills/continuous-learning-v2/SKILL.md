@@ -26,6 +26,14 @@ v2.2 keeps the same core model (observations -> instincts -> evolve/promote) but
 4. Evolve instincts into higher-level assets
 5. Promote cross-project patterns to global scope
 
+## Arbitration Role
+
+`continuous-learning-v2` is a learning layer, not a phase driver.
+
+- It can run alongside implementation and verification phases.
+- It must not block `security-*`, `search-first`, `tdd-workflow`, or `verification-loop`.
+- Prefer mining at checkpoints, not in the middle of active coding/debugging loops.
+
 ## Codex-Native Quick Start (No Hooks Required)
 
 Use the CLI from repo root:

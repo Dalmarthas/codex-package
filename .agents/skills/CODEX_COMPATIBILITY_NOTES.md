@@ -11,3 +11,5 @@ For affected skills, this package now includes Codex-native alternatives:
 - `security-scan`: Codex workspace scanning workflow (plus legacy-file checks when present)
 
 Hook scripts remain optional for runtimes that support them.
+
+For overlapping skill behavior, see `.codex/SKILL_PRECEDENCE.md`.

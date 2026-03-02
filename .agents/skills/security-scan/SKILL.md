@@ -16,6 +16,20 @@ Audit Codex configuration and agent assets for security issues.
 - When onboarding into a repository that already has Codex assets
 - As a periodic hygiene check
 
+## When Not to Activate
+
+- Routine feature coding with no config/policy/runtime-asset changes
+- As a substitute for code-level security design review (use `security-review`)
+
+## Conflict Guardrails
+
+- If both `security-scan` and `verification-loop` apply, run both at checkpoint time:
+  - `security-scan` for policy/config/assets risk
+  - `verification-loop` for build/test/readiness
+- If both `security-scan` and `security-review` apply:
+  - `security-review` drives code-level changes
+  - `security-scan` gates repository/config safety before merge/push
+
 ## What It Scans
 
 | Path | Checks |

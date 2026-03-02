@@ -1,6 +1,6 @@
 ---
 name: tdd-workflow
-description: Use this skill when writing new features, fixing bugs, or refactoring code. Enforces test-driven development with 80%+ coverage including unit, integration, and E2E tests.
+description: Use when implementing behavior changes (features, bug fixes, refactors) so tests drive code changes; use verification-loop later for final release checks.
 origin: ECC
 ---
 
@@ -15,6 +15,17 @@ This skill ensures all code development follows TDD principles with comprehensiv
 - Refactoring existing code
 - Adding API endpoints
 - Creating new components
+
+## When Not to Activate
+
+- Pure discovery/research phase (use `search-first`)
+- Final release-readiness gate (use `verification-loop`)
+- Config-only security audits (use `security-scan`)
+
+## Conflict Guardrails
+
+- If both `tdd-workflow` and `verification-loop` trigger, `tdd-workflow` is the driver during red/green cycles.
+- Run `verification-loop` only at milestones (end of feature slice, pre-commit, pre-push), not after each micro-step.
 
 ## Core Principles
 
