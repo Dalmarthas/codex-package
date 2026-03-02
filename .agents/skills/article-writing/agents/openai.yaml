@@ -4,4 +4,4 @@ interface:
   brand_color: "#B45309"
   default_prompt: "Draft a sharp long-form article from these notes and examples"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

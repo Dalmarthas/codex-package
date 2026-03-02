@@ -4,4 +4,4 @@ interface:
   brand_color: "#DC2626"
   default_prompt: "Turn this source asset into strong multi-platform content"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

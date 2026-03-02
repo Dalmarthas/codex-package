@@ -4,4 +4,4 @@ interface:
   brand_color: "#14B8A6"
   default_prompt: "Suggest task boundary compaction for context management"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

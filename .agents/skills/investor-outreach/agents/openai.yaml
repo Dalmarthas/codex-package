@@ -4,4 +4,4 @@ interface:
   brand_color: "#059669"
   default_prompt: "Draft a personalized investor outreach email with a clear low-friction ask"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
